@@ -1581,6 +1581,10 @@
 
 	    _this.audioStreams = {};
 	    _this.videoStreams = {}; //solaris
+	    _this.screenStreams = {}; //solaris
+
+	    _this.pendingScreenRequest = {};
+	    _this.pendingVideoRequest = {};
 	    _this.pendingAudioRequest = {};
 
 	    _this.serverTimeRequests = 0;
@@ -1613,6 +1617,10 @@
 	    value: function setWebRtcOptions(options) {
 	      // this.easyrtc.enableDebug(true);
 	      this.easyrtc.enableDataChannels(options.datachannel);
+
+	      if (options.screenShare) {
+	        this.easyrtc.setScreenCapture();
+	      }
 
 	      this.easyrtc.enableVideo(options.video /*false*/); //solaris
 	      this.easyrtc.enableAudio(options.audio);
@@ -1766,15 +1774,31 @@
 	    }
 	  }, {
 	    key: "getMediaStream",
-	    value: function getMediaStream(clientId) {
+	    value: function getMediaStream(clientId, type) {
 	      var that = this;
-	      if (this.audioStreams[clientId]) {
+	      var streams = void 0;
+	      var pendingRequest = void 0;
+	      if (type === 'video') {
+	        streams = this.videoStreams;
+	        pendingRequest = that.pendingVideoRequest;
+	      } else if (type === 'audio') {
+	        streams = this.audioStreams;
+	        pendingRequest = that.pendingAudioRequest;
+	      } else if (type === 'screen') {
+	        streams = this.screenStreams;
+	        pendingRequest = that.pendingScreenRequest;
+	      } else {
+	        console.log("Failed to getMediaStream for unknown or null type");
+	        return;
+	      }
+
+	      if (streams[clientId]) {
 	        NAF.log.write("Already had audio for " + clientId);
-	        return Promise.resolve(this.audioStreams[clientId]);
+	        return Promise.resolve(streams[clientId]);
 	      } else {
 	        NAF.log.write("Waiting on audio for " + clientId);
 	        return new Promise(function (resolve) {
-	          that.pendingAudioRequest[clientId] = resolve;
+	          pendingRequest[clientId] = resolve;
 	        });
 	      }
 	    }
@@ -1799,6 +1823,16 @@
 	      }
 	    }
 	  }, {
+	    key: "_storeVideoStream",
+	    value: function _storeVideoStream(easyrtcid, stream) {
+	      this.videoStreams[easyrtcid] = stream;
+	      if (this.pendingVideoRequest[easyrtcid]) {
+	        NAF.log.write("got pending audio for " + easyrtcid);
+	        this.pendingVideoRequest[easyrtcid](stream);
+	        delete this.pendingVideoRequest[easyrtcid](stream);
+	      }
+	    }
+	  }, {
 	    key: "_connectWithAudio",
 	    value: function _connectWithAudio(connectSuccess, connectFailure) {
 	      var that = this;
@@ -1815,6 +1849,28 @@
 	        NAF.log.error(errorCode, errmesg);
 	      });
 	    }
+
+	    // solaris
+
+	  }, {
+	    key: "_connectWithVideo",
+	    value: function _connectWithVideo(connectSuccess, connectFailure) {
+	      var that = this;
+
+	      this.easyrtc.setStreamAcceptor(this._storeVideoStream.bind(this));
+
+	      this.easyrtc.setOnStreamClosed(function (easyrtcid) {
+	        delete that.videoStreams[easyrtcid];
+	      });
+
+	      this.easyrtc.initMediaSource(function () {
+	        that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+	      }, function (errorCode, errmesg) {
+	        NAF.log.error(errorCode, errmesg);
+	      });
+	    }
+	    // end solaris
+
 	  }, {
 	    key: "_getRoomJoinTime",
 	    value: function _getRoomJoinTime(clientId) {
@@ -1852,6 +1908,7 @@
 	    adapter: { default: 'wsEasyRtc' }, // See https://github.com/networked-aframe/networked-aframe#adapters for list of adapters
 	    audio: { default: false }, // Only if adapter supports audio
 	    video: { default: false },
+	    screenShare: { default: false },
 	    debug: { default: false }
 	  },
 
@@ -1877,8 +1934,8 @@
 	    if (this.hasOnConnectFunction()) {
 	      this.callOnConnect();
 	    }
-	    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + '}');
-	    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video);
+	    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + "screenShare:" + this.data.screenShare + '}');
+	    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video, this.data.screenShare);
 	  },
 
 	  checkDeprecatedProperties: function checkDeprecatedProperties() {
@@ -2618,7 +2675,7 @@
 	      var ownerId = networkedEl.components.networked.data.owner;
 
 	      if (ownerId) {
-	        NAF.connection.adapter.getMediaStream(ownerId).then(_this._setMediaStream).catch(function (e) {
+	        NAF.connection.adapter.getMediaStream(ownerId, 'audio').then(_this._setMediaStream).catch(function (e) {
 	          return naf.log.error('Error getting media stream for ' + ownerId, e);
 	        });
 	      } else {

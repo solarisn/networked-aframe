@@ -10,6 +10,7 @@ AFRAME.registerComponent('networked-scene', {
     adapter: {default: 'wsEasyRtc'}, // See https://github.com/networked-aframe/networked-aframe#adapters for list of adapters
     audio: {default: false}, // Only if adapter supports audio
     video: {default: false},
+    screenShare: {default: false},
     debug: {default: false},
   },
 
@@ -35,8 +36,8 @@ AFRAME.registerComponent('networked-scene', {
     if (this.hasOnConnectFunction()) {
       this.callOnConnect();
     }
-    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + '}');
-    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video);
+    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + "screenShare:" + this.data.screenShare +'}');
+    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video, this.data.screenShare);
   },
 
   checkDeprecatedProperties: function() {

@@ -12,6 +12,10 @@ class EasyRtcAdapter extends NoOpAdapter {
 
     this.audioStreams = {};
     this.videoStreams = {}; //solaris
+    this.screenStreams = {}; //solaris
+
+    this.pendingScreenRequest = {};
+    this.pendingVideoRequest = {};
     this.pendingAudioRequest = {};
 
     this.serverTimeRequests = 0;
@@ -36,6 +40,10 @@ class EasyRtcAdapter extends NoOpAdapter {
   setWebRtcOptions(options) {
     // this.easyrtc.enableDebug(true);
     this.easyrtc.enableDataChannels(options.datachannel);
+
+    if (options.screenShare) {
+      this.easyrtc.setScreenCapture();
+    }
 
     this.easyrtc.enableVideo(options.video/*false*/); //solaris
     this.easyrtc.enableAudio(options.audio);
@@ -182,15 +190,31 @@ class EasyRtcAdapter extends NoOpAdapter {
     }
   }
 
-  getMediaStream(clientId) {
+  getMediaStream(clientId, type) {
     var that = this;
-    if (this.audioStreams[clientId]) {
+    let streams;
+    let pendingRequest;
+    if (type === 'video') {
+      streams = this.videoStreams;
+      pendingRequest = that.pendingVideoRequest;
+    } else if (type === 'audio') {
+      streams = this.audioStreams;
+      pendingRequest = that.pendingAudioRequest;
+    } else if (type === 'screen') {
+      streams = this.screenStreams;
+      pendingRequest = that.pendingScreenRequest;
+    } else {
+      console.log("Failed to getMediaStream for unknown or null type");
+      return;
+    }
+
+    if (streams[clientId]) {
       NAF.log.write("Already had audio for " + clientId);
-      return Promise.resolve(this.audioStreams[clientId]);
+      return Promise.resolve(streams[clientId]);
     } else {
       NAF.log.write("Waiting on audio for " + clientId);
       return new Promise(function(resolve) {
-        that.pendingAudioRequest[clientId] = resolve;
+        pendingRequest[clientId] = resolve;
       });
     }
   }
@@ -212,6 +236,15 @@ class EasyRtcAdapter extends NoOpAdapter {
     }
   }
 
+  _storeVideoStream(easyrtcid, stream) {
+    this.videoStreams[easyrtcid] = stream;
+    if (this.pendingVideoRequest[easyrtcid]) {
+      NAF.log.write("got pending audio for " + easyrtcid);
+      this.pendingVideoRequest[easyrtcid](stream);
+      delete this.pendingVideoRequest[easyrtcid](stream);
+    }
+  }
+
   _connectWithAudio(connectSuccess, connectFailure) {
     var that = this;
 
@@ -230,6 +263,27 @@ class EasyRtcAdapter extends NoOpAdapter {
       }
     );
   }
+
+// solaris
+  _connectWithVideo(connectSuccess, connectFailure) {
+    var that = this;
+
+    this.easyrtc.setStreamAcceptor(this._storeVideoStream.bind(this));
+
+    this.easyrtc.setOnStreamClosed(function(easyrtcid) {
+      delete that.videoStreams[easyrtcid];
+    });
+
+    this.easyrtc.initMediaSource(
+      function() {
+        that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+      },
+      function(errorCode, errmesg) {
+        NAF.log.error(errorCode, errmesg);
+      }
+    );
+  }
+// end solaris
 
   _getRoomJoinTime(clientId) {
     var myRoomId = NAF.room;

@@ -23,7 +23,7 @@ AFRAME.registerComponent('networked-audio-source', {
       const ownerId = networkedEl.components.networked.data.owner;
 
       if (ownerId) {
-        NAF.connection.adapter.getMediaStream(ownerId)
+        NAF.connection.adapter.getMediaStream(ownerId, 'audio')
           .then(this._setMediaStream)
           .catch((e) => naf.log.error(`Error getting media stream for ${ownerId}`, e));
       } else {
