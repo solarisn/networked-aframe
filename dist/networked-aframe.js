@@ -329,7 +329,7 @@
 	module.exports.getNetworkId = function (el) {
 	  var components = el.components;
 	  if (components.hasOwnProperty('networked')) {
-	    return components['networked'].networkId;
+	    return components['networked'].data.networkId;
 	  }
 	  return null;
 	};
@@ -915,6 +915,7 @@
 	    key: 'connect',
 	    value: function connect(serverUrl, appName, roomName) {
 	      var enableAudio = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+	      var enableVideo = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : false;
 
 	      NAF.app = appName;
 	      NAF.room = roomName;
@@ -925,7 +926,7 @@
 
 	      var webrtcOptions = {
 	        audio: enableAudio,
-	        video: false,
+	        video: enableVideo,
 	        datachannel: true
 	      };
 	      this.adapter.setWebRtcOptions(webrtcOptions);
@@ -934,7 +935,7 @@
 	      this.adapter.setDataChannelListeners(this.dataChannelOpen.bind(this), this.dataChannelClosed.bind(this), this.receivedData.bind(this));
 	      this.adapter.setRoomOccupantListener(this.occupantsReceived.bind(this));
 
-	      this.adapter.connect();
+	      return this.adapter.connect();
 	    }
 	  }, {
 	    key: 'onConnect',
@@ -1579,6 +1580,7 @@
 	    _this.room = "default";
 
 	    _this.audioStreams = {};
+	    _this.videoStreams = {}; //solaris
 	    _this.pendingAudioRequest = {};
 
 	    _this.serverTimeRequests = 0;
@@ -1612,10 +1614,10 @@
 	      // this.easyrtc.enableDebug(true);
 	      this.easyrtc.enableDataChannels(options.datachannel);
 
-	      this.easyrtc.enableVideo(false);
+	      this.easyrtc.enableVideo(options.video /*false*/); //solaris
 	      this.easyrtc.enableAudio(options.audio);
 
-	      this.easyrtc.enableVideoReceive(false);
+	      this.easyrtc.enableVideoReceive(options.video /*false*/);
 	      this.easyrtc.enableAudioReceive(options.audio);
 	    }
 	  }, {
@@ -1849,6 +1851,7 @@
 	    onConnect: { default: 'onConnect' },
 	    adapter: { default: 'wsEasyRtc' }, // See https://github.com/networked-aframe/networked-aframe#adapters for list of adapters
 	    audio: { default: false }, // Only if adapter supports audio
+	    video: { default: false },
 	    debug: { default: false }
 	  },
 
@@ -1874,7 +1877,8 @@
 	    if (this.hasOnConnectFunction()) {
 	      this.callOnConnect();
 	    }
-	    NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio);
+	    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + '}');
+	    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video);
 	  },
 
 	  checkDeprecatedProperties: function checkDeprecatedProperties() {
@@ -2637,13 +2641,19 @@
 	      }
 	      if (newStream) {
 	        // Chrome seems to require a MediaStream be attached to an AudioElement before AudioNodes work correctly
-	        this.audioEl = new Audio();
-	        this.audioEl.setAttribute("autoplay", "autoplay");
-	        this.audioEl.setAttribute("playsinline", "playsinline");
-	        this.audioEl.srcObject = newStream;
-	        this.audioEl.volume = 0; // we don't actually want to hear audio from this element
+	        // We don't want to do this in other browsers, particularly in Safari, which actually plays the audio despite
+	        // setting the volume to 0.
+	        if (/chrome/i.test(navigator.userAgent)) {
+	          this.audioEl = new Audio();
+	          this.audioEl.setAttribute("autoplay", "autoplay");
+	          this.audioEl.setAttribute("playsinline", "playsinline");
+	          this.audioEl.srcObject = newStream;
+	          this.audioEl.volume = 0; // we don't actually want to hear audio from this element
+	        }
 
-	        this.sound.setNodeSource(this.sound.context.createMediaStreamSource(newStream));
+	        var soundSource = this.sound.context.createMediaStreamSource(newStream);
+	        this.sound.setNodeSource(soundSource);
+	        this.el.emit('sound-source-set', { soundSource: soundSource });
 	      }
 	      this.stream = newStream;
 	    }
