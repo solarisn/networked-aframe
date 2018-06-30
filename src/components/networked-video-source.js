@@ -1,7 +1,7 @@
 /* global AFRAME, NAF, THREE */
 var naf = require('../NafIndex');
 
-AFRAME.registerComponent('networked-audio-source', {
+AFRAME.registerComponent('networked-video-source', {
   schema: {
     positional: { default: true },
     rotational: { default: true }
