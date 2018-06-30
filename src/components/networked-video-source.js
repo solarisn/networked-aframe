@@ -8,6 +8,7 @@ AFRAME.registerComponent('networked-audio-source', {
   },
 
   init: function () {
+    console.log('initializing a networked-video-source');
     this.listener = null;
     this.stream = null;
 
