@@ -11,6 +11,7 @@ class EasyRtcAdapter extends NoOpAdapter {
     this.room = "default";
 
     this.audioStreams = {};
+    this.videoStreams = {}; //solaris
     this.pendingAudioRequest = {};
 
     this.serverTimeRequests = 0;
@@ -36,10 +37,10 @@ class EasyRtcAdapter extends NoOpAdapter {
     // this.easyrtc.enableDebug(true);
     this.easyrtc.enableDataChannels(options.datachannel);
 
-    this.easyrtc.enableVideo(false);
+    this.easyrtc.enableVideo(options.video/*false*/); //solaris
     this.easyrtc.enableAudio(options.audio);
 
-    this.easyrtc.enableVideoReceive(false);
+    this.easyrtc.enableVideoReceive(options.video/*false*/);
     this.easyrtc.enableAudioReceive(options.audio);
   }
 
