@@ -31,6 +31,7 @@ AFRAME.registerComponent('networked-audio-source', {
   },
 
   _setMediaStream(newStream) {
+    console.log("_setMediaAtream on networked-video-source");
     this.stream = newStream;
     var videoNode = document.createElement("VIDEO");                 // Create a <li> node
     videoNode.setAttribute("id", "local");
