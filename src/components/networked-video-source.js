@@ -11,7 +11,11 @@ AFRAME.registerComponent('networked-video-source', {
     console.log('initializing a networked-video-source');
     this.listener = null;
     this.stream = null;
+    var randomId = this._makeId(5);
+    this.randomId = randomId;
+    this.el.setAttribute("id", randomId);
 
+    this._makeId = this._makeId.bind(this);
     this._setMediaStream = this._setMediaStream.bind(this);
 
     NAF.utils.getNetworkedEntity(this.el).then((networkedEl) => {
@@ -38,7 +42,7 @@ AFRAME.registerComponent('networked-video-source', {
             console.log(error);
           });
 
-          
+
 
         }
 
@@ -54,17 +58,23 @@ AFRAME.registerComponent('networked-video-source', {
   _setMediaStream(newStream) {
     console.log("_setMediaAtream on networked-video-source");
     //this.stream = newStream;
+    // var allElements = document.getElementsByClassName('avideo');
+    // for (var i in allElements) {
+    //   var temp = allElements[i];
+    //   console.log(temp.networked.networkId);
+    // }
+    // var randomId = this._makeId(5);
     var videoNode = document.createElement("VIDEO");                 // Create a <li> node
-    videoNode.setAttribute("id", "local");
+    videoNode.setAttribute("id", "video-" + this.randomId);
     videoNode.autoplay = true;
     console.log('new stream: ');
     console.log(newStream);
     videoNode.srcObject = newStream;
     document.getElementsByTagName("a-assets")[0].appendChild(videoNode);
     //this.setAttribute("src", "#local");
-    this.videoElement = videoNode;
-    this.element = document.getElementById('localVideo');
-    this.element.setAttribute('src', '#local');
+    this.localVideo = videoNode;
+    this.element = this.el;
+    this.element.setAttribute('src', '#video-' + this.randomId);
     this.stream = newStream;
     // if(!this.sound) {
     //   this.setupSound();
@@ -94,6 +104,17 @@ AFRAME.registerComponent('networked-video-source', {
     // }
     
 
+  },
+
+  _makeId(length) {
+    var text = "";
+    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    for (var i = 0; i < length; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+
+    return text;
   },
 
   // _setPannerProperties() {
