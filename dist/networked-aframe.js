@@ -280,6 +280,8 @@
 	naf.entities = entities;
 
 	module.exports = window.NAF = naf;
+	console.log("EasyRTC");
+	console.log(easyrtc);
 
 /***/ }),
 /* 4 */
@@ -917,6 +919,7 @@
 	    value: function connect(serverUrl, appName, roomName) {
 	      var enableAudio = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
 	      var enableVideo = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : false;
+	      var enableScreen = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : false;
 
 	      NAF.app = appName;
 	      NAF.room = roomName;
@@ -1480,7 +1483,7 @@
 	    }
 	  }, {
 	    key: 'getMediaStream',
-	    value: function getMediaStream(clientId) {
+	    value: function getMediaStream(clientId, dataType) {
 	      return Promise.reject("Interface method not implemented: getMediaStream");
 	    }
 	  }, {
@@ -1909,7 +1912,7 @@
 	    adapter: { default: 'wsEasyRtc' }, // See https://github.com/networked-aframe/networked-aframe#adapters for list of adapters
 	    audio: { default: false }, // Only if adapter supports audio
 	    video: { default: false },
-	    screenShare: { default: false },
+	    screen: { default: false },
 	    debug: { default: false }
 	  },
 
@@ -1936,7 +1939,7 @@
 	      this.callOnConnect();
 	    }
 	    console.log('connecting with {audio:' + this.data.audio + ',video:' + this.data.video + "screenShare:" + this.data.screenShare + '}');
-	    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video, this.data.screenShare);
+	    return NAF.connection.connect(this.data.serverURL, this.data.app, this.data.room, this.data.audio, this.data.video, this.data.screen);
 	  },
 
 	  checkDeprecatedProperties: function checkDeprecatedProperties() {

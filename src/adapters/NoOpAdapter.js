@@ -19,7 +19,7 @@ class NoOpAdapter extends NafInterface {
   closeStreamConnection(clientId) {this.notImplemented('closeStreamConnection')}
   getConnectStatus(clientId) {this.notImplemented('getConnectStatus')}
 
-  getMediaStream(clientId) { return Promise.reject("Interface method not implemented: getMediaStream")}
+  getMediaStream(clientId, dataType) { return Promise.reject("Interface method not implemented: getMediaStream")}
 
   getServerTime() { this.notImplemented('getServerTime') }
 

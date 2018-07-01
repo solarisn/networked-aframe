@@ -25,7 +25,7 @@ class NetworkConnection {
         = this.entities.removeRemoteEntity.bind(this.entities);
   }
 
-  connect(serverUrl, appName, roomName, enableAudio = false, enableVideo = false) {
+  connect(serverUrl, appName, roomName, enableAudio = false, enableVideo = false, enableScreen = false) {
     NAF.app = appName;
     NAF.room = roomName;
 
