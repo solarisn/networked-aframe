@@ -23,5 +23,4 @@ naf.connection = connection;
 naf.entities = entities;
 
 module.exports = window.NAF = naf;
-console.log("EasyRTC");
-console.log(easyrtc);
+//module.exports = window.easyrtc = easyrtc;

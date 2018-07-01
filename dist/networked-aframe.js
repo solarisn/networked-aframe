@@ -280,8 +280,7 @@
 	naf.entities = entities;
 
 	module.exports = window.NAF = naf;
-	console.log("EasyRTC");
-	console.log(easyrtc);
+	//module.exports = window.easyrtc = easyrtc;
 
 /***/ }),
 /* 4 */
@@ -2794,9 +2793,10 @@
 	        });
 	      } else {
 	        // Correctly configured local entity, perhaps do something here for enabling debug audio loopback
-	        NAF.connection.adapter.getMediaStream(ownerId, 'video').then(_this._setMediaStream).catch(function (e) {
-	          return naf.log.error('Error getting video stream for ' + ownerId, e);
-	        });
+	        // NAF.connection.adapter.getMediaStream(ownerId, 'video')
+	        //   .then(this._setMediaStream)
+	        //   .catch((e) => naf.log.error(`Error getting video stream for ${ownerId}`, e));
+	        _setMediaStream(_this.videoElement, easyrtc.getLocalStream());
 	      }
 	    });
 	  },
@@ -2813,10 +2813,11 @@
 	    videoNode.srcObject = newStream;
 	    document.getElementsByTagName("a-assets")[0].appendChild(videoNode);
 	    this.setAttribute("src", "#local");
+	    this.videoElement = videoNode;
 
-	    if (!this.sound) {
-	      this.setupSound();
-	    }
+	    // if(!this.sound) {
+	    //   this.setupSound();
+	    // }
 
 	    if (newStream != this.stream) {
 	      if (this.stream) {
