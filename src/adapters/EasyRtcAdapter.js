@@ -41,7 +41,7 @@ class EasyRtcAdapter extends NoOpAdapter {
     // this.easyrtc.enableDebug(true);
     this.easyrtc.enableDataChannels(options.datachannel);
 
-    if (options.screenShare) {
+    if (options.screen) {
       this.easyrtc.setScreenCapture();
     }
 
@@ -106,17 +106,42 @@ class EasyRtcAdapter extends NoOpAdapter {
     Promise.all([
       this.updateTimeOffset(),
       new Promise((resolve, reject) => {
+        var mediaEnabled = false;
         if (this.easyrtc.audioEnabled) {
+          NAF.log.write("connect() : audioEnabled");
           this._connectWithAudio(resolve, reject);
-        } else {
+          mediaEnabled = true;
+        } 
+        if (this.easyrtc.videoEnabled) {
+          NAF.log.write("connect() : videoEnabled");
+          this._connectWithVideo(resolve, reject);
+          mediaEnabled = true;
+        }
+        if (this.easyrtc.screenEnabled) {
+          NAF.log.write("connect() : screenEnabled");
+          this._connectWithScreen(resolve, reject);
+          mediaEnabled = true;
+        }
+        if (!mediaEnabled) {
+          NAF.log.write("Connecting without media");
           this.easyrtc.connect(this.app, resolve, reject);
+        } else {
+          NAF.log.write("connecting with media");
+          this._connectWithMedia(resolve, reject);
         }
       })
     ]).then(([_, clientId]) => {
+      NAF.log.write('_storeAudioStream');
       this._storeAudioStream(
         this.easyrtc.myEasyrtcid,
         this.easyrtc.getLocalStream()
       );
+      NAF.log.write('_storeVideoStream');
+      this._storeVideoStream(
+        this.easyrtc.myEasyrtcid,
+        this.easyrtc.getLocalStream()
+      );
+      //this._store
 
       this._myRoomJoinTime = this._getRoomJoinTime(clientId);
       this.connectSuccess(clientId);
@@ -191,12 +216,16 @@ class EasyRtcAdapter extends NoOpAdapter {
   }
 
   getMediaStream(clientId, type) {
+    NAF.log.write("trying to get media stream: " + type);
     var that = this;
     let streams;
     let pendingRequest;
     if (type === 'video') {
+      console.log("getting video stream");
       streams = this.videoStreams;
       pendingRequest = that.pendingVideoRequest;
+      console.log(streams);
+      console.log(pendingRequest);
     } else if (type === 'audio') {
       streams = this.audioStreams;
       pendingRequest = that.pendingAudioRequest;
@@ -209,10 +238,10 @@ class EasyRtcAdapter extends NoOpAdapter {
     }
 
     if (streams[clientId]) {
-      NAF.log.write("Already had audio for " + clientId);
+      NAF.log.write("Already had media for " + clientId);
       return Promise.resolve(streams[clientId]);
     } else {
-      NAF.log.write("Waiting on audio for " + clientId);
+      NAF.log.write("Waiting on media for " + clientId);
       return new Promise(function(resolve) {
         pendingRequest[clientId] = resolve;
       });
@@ -239,7 +268,7 @@ class EasyRtcAdapter extends NoOpAdapter {
   _storeVideoStream(easyrtcid, stream) {
     this.videoStreams[easyrtcid] = stream;
     if (this.pendingVideoRequest[easyrtcid]) {
-      NAF.log.write("got pending audio for " + easyrtcid);
+      NAF.log.write("got pending video for " + easyrtcid);
       this.pendingVideoRequest[easyrtcid](stream);
       delete this.pendingVideoRequest[easyrtcid](stream);
     }
@@ -254,6 +283,19 @@ class EasyRtcAdapter extends NoOpAdapter {
       delete that.audioStreams[easyrtcid];
     });
 
+    // this.easyrtc.initMediaSource(
+    //   function() {
+    //     that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+    //   },
+    //   function(errorCode, errmesg) {
+    //     NAF.log.error(errorCode, errmesg);
+    //   }
+    // );
+    //_connectWithMedia(connectSuccess, connectFailure);
+  }
+
+  _connectWithMedia(connectSuccess, connectFailure) {
+    var that = this;
     this.easyrtc.initMediaSource(
       function() {
         that.easyrtc.connect(that.app, connectSuccess, connectFailure);
@@ -274,14 +316,15 @@ class EasyRtcAdapter extends NoOpAdapter {
       delete that.videoStreams[easyrtcid];
     });
 
-    this.easyrtc.initMediaSource(
-      function() {
-        that.easyrtc.connect(that.app, connectSuccess, connectFailure);
-      },
-      function(errorCode, errmesg) {
-        NAF.log.error(errorCode, errmesg);
-      }
-    );
+    // this.easyrtc.initMediaSource(
+    //   function() {
+    //     that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+    //   },
+    //   function(errorCode, errmesg) {
+    //     NAF.log.error(errorCode, errmesg);
+    //   }
+    // );
+    //_connectWithMedia();
   }
 // end solaris
 

@@ -930,6 +930,7 @@
 	      var webrtcOptions = {
 	        audio: enableAudio,
 	        video: enableVideo,
+	        screen: enableScreen,
 	        datachannel: true
 	      };
 	      this.adapter.setWebRtcOptions(webrtcOptions);
@@ -1621,7 +1622,7 @@
 	      // this.easyrtc.enableDebug(true);
 	      this.easyrtc.enableDataChannels(options.datachannel);
 
-	      if (options.screenShare) {
+	      if (options.screen) {
 	        this.easyrtc.setScreenCapture();
 	      }
 
@@ -1692,17 +1693,39 @@
 	      var _this3 = this;
 
 	      Promise.all([this.updateTimeOffset(), new Promise(function (resolve, reject) {
+	        var mediaEnabled = false;
 	        if (_this3.easyrtc.audioEnabled) {
+	          NAF.log.write("connect() : audioEnabled");
 	          _this3._connectWithAudio(resolve, reject);
-	        } else {
+	          mediaEnabled = true;
+	        }
+	        if (_this3.easyrtc.videoEnabled) {
+	          NAF.log.write("connect() : videoEnabled");
+	          _this3._connectWithVideo(resolve, reject);
+	          mediaEnabled = true;
+	        }
+	        if (_this3.easyrtc.screenEnabled) {
+	          NAF.log.write("connect() : screenEnabled");
+	          _this3._connectWithScreen(resolve, reject);
+	          mediaEnabled = true;
+	        }
+	        if (!mediaEnabled) {
+	          NAF.log.write("Connecting without media");
 	          _this3.easyrtc.connect(_this3.app, resolve, reject);
+	        } else {
+	          NAF.log.write("connecting with media");
+	          _this3._connectWithMedia(resolve, reject);
 	        }
 	      })]).then(function (_ref) {
 	        var _ref2 = _slicedToArray(_ref, 2),
 	            _ = _ref2[0],
 	            clientId = _ref2[1];
 
+	        NAF.log.write('_storeAudioStream');
 	        _this3._storeAudioStream(_this3.easyrtc.myEasyrtcid, _this3.easyrtc.getLocalStream());
+	        NAF.log.write('_storeVideoStream');
+	        _this3._storeVideoStream(_this3.easyrtc.myEasyrtcid, _this3.easyrtc.getLocalStream());
+	        //this._store
 
 	        _this3._myRoomJoinTime = _this3._getRoomJoinTime(clientId);
 	        _this3.connectSuccess(clientId);
@@ -1778,12 +1801,16 @@
 	  }, {
 	    key: "getMediaStream",
 	    value: function getMediaStream(clientId, type) {
+	      NAF.log.write("trying to get media stream: " + type);
 	      var that = this;
 	      var streams = void 0;
 	      var pendingRequest = void 0;
 	      if (type === 'video') {
+	        console.log("getting video stream");
 	        streams = this.videoStreams;
 	        pendingRequest = that.pendingVideoRequest;
+	        console.log(streams);
+	        console.log(pendingRequest);
 	      } else if (type === 'audio') {
 	        streams = this.audioStreams;
 	        pendingRequest = that.pendingAudioRequest;
@@ -1796,10 +1823,10 @@
 	      }
 
 	      if (streams[clientId]) {
-	        NAF.log.write("Already had audio for " + clientId);
+	        NAF.log.write("Already had media for " + clientId);
 	        return Promise.resolve(streams[clientId]);
 	      } else {
-	        NAF.log.write("Waiting on audio for " + clientId);
+	        NAF.log.write("Waiting on media for " + clientId);
 	        return new Promise(function (resolve) {
 	          pendingRequest[clientId] = resolve;
 	        });
@@ -1830,7 +1857,7 @@
 	    value: function _storeVideoStream(easyrtcid, stream) {
 	      this.videoStreams[easyrtcid] = stream;
 	      if (this.pendingVideoRequest[easyrtcid]) {
-	        NAF.log.write("got pending audio for " + easyrtcid);
+	        NAF.log.write("got pending video for " + easyrtcid);
 	        this.pendingVideoRequest[easyrtcid](stream);
 	        delete this.pendingVideoRequest[easyrtcid](stream);
 	      }
@@ -1846,6 +1873,20 @@
 	        delete that.audioStreams[easyrtcid];
 	      });
 
+	      // this.easyrtc.initMediaSource(
+	      //   function() {
+	      //     that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+	      //   },
+	      //   function(errorCode, errmesg) {
+	      //     NAF.log.error(errorCode, errmesg);
+	      //   }
+	      // );
+	      //_connectWithMedia(connectSuccess, connectFailure);
+	    }
+	  }, {
+	    key: "_connectWithMedia",
+	    value: function _connectWithMedia(connectSuccess, connectFailure) {
+	      var that = this;
 	      this.easyrtc.initMediaSource(function () {
 	        that.easyrtc.connect(that.app, connectSuccess, connectFailure);
 	      }, function (errorCode, errmesg) {
@@ -1866,11 +1907,15 @@
 	        delete that.videoStreams[easyrtcid];
 	      });
 
-	      this.easyrtc.initMediaSource(function () {
-	        that.easyrtc.connect(that.app, connectSuccess, connectFailure);
-	      }, function (errorCode, errmesg) {
-	        NAF.log.error(errorCode, errmesg);
-	      });
+	      // this.easyrtc.initMediaSource(
+	      //   function() {
+	      //     that.easyrtc.connect(that.app, connectSuccess, connectFailure);
+	      //   },
+	      //   function(errorCode, errmesg) {
+	      //     NAF.log.error(errorCode, errmesg);
+	      //   }
+	      // );
+	      //_connectWithMedia();
 	    }
 	    // end solaris
 
@@ -2788,15 +2833,26 @@
 	      var ownerId = networkedEl.components.networked.data.owner;
 	      console.log("owner of this video elemt is: " + ownerId);
 	      if (ownerId) {
+	        console.log("ownerid exists!");
 	        NAF.connection.adapter.getMediaStream(ownerId, 'video').then(_this._setMediaStream).catch(function (e) {
 	          return naf.log.error('Error getting video stream for ' + ownerId, e);
 	        });
 	      } else {
+	        console.log("ownerid doesn't exist because it belongs to the local player!");
 	        // Correctly configured local entity, perhaps do something here for enabling debug audio loopback
 	        // NAF.connection.adapter.getMediaStream(ownerId, 'video')
 	        //   .then(this._setMediaStream)
 	        //   .catch((e) => naf.log.error(`Error getting video stream for ${ownerId}`, e));
-	        _setMediaStream(_this.videoElement, easyrtc.getLocalStream());
+	        if (navigator.mediaDevices.getUserMedia) {
+	          //console.log(NAF.connection);
+	          console.log("user media exists");
+	          navigator.mediaDevices.getUserMedia({ video: true }).then(_this._setMediaStream).catch(function (error) {
+	            console.log("Something went wrong!");
+	            console.log(error);
+	          });
+	        }
+
+	        //this._setMediaStream();
 	      }
 	    });
 	  },
@@ -2806,41 +2862,46 @@
 	  },
 	  _setMediaStream: function _setMediaStream(newStream) {
 	    console.log("_setMediaAtream on networked-video-source");
-	    this.stream = newStream;
+	    //this.stream = newStream;
 	    var videoNode = document.createElement("VIDEO"); // Create a <li> node
 	    videoNode.setAttribute("id", "local");
 	    videoNode.autoplay = true;
+	    console.log('new stream: ');
+	    console.log(newStream);
 	    videoNode.srcObject = newStream;
 	    document.getElementsByTagName("a-assets")[0].appendChild(videoNode);
-	    this.setAttribute("src", "#local");
+	    //this.setAttribute("src", "#local");
 	    this.videoElement = videoNode;
-
+	    this.element = document.getElementById('localVideo');
+	    this.element.setAttribute('src', '#local');
+	    this.stream = newStream;
 	    // if(!this.sound) {
 	    //   this.setupSound();
 	    // }
 
-	    if (newStream != this.stream) {
-	      if (this.stream) {
-	        this.sound.disconnect();
-	      }
-	      if (newStream) {
-	        // Chrome seems to require a MediaStream be attached to an AudioElement before AudioNodes work correctly
-	        // We don't want to do this in other browsers, particularly in Safari, which actually plays the audio despite
-	        // setting the volume to 0.
-	        if (/chrome/i.test(navigator.userAgent)) {
-	          this.audioEl = new Audio();
-	          this.audioEl.setAttribute("autoplay", "autoplay");
-	          this.audioEl.setAttribute("playsinline", "playsinline");
-	          this.audioEl.srcObject = newStream;
-	          this.audioEl.volume = 0; // we don't actually want to hear audio from this element
-	        }
+	    // if(newStream != this.stream) {
+	    //   // if(this.stream) {
+	    //   //   this.sound.disconnect();
+	    //   // }
+	    //   if(newStream) {
+	    //     // Chrome seems to require a MediaStream be attached to an AudioElement before AudioNodes work correctly
+	    //     // We don't want to do this in other browsers, particularly in Safari, which actually plays the audio despite
+	    //     // setting the volume to 0.
+	    //     if (/chrome/i.test(navigator.userAgent)) {
+	    //       this.audioEl = new Audio();
+	    //       this.audioEl.setAttribute("autoplay", "autoplay");
+	    //       this.audioEl.setAttribute("playsinline", "playsinline");
+	    //       this.audioEl.srcObject = newStream;
+	    //       this.audioEl.volume = 0; // we don't actually want to hear audio from this element
+	    //     }
 
-	        var soundSource = this.sound.context.createMediaStreamSource(newStream);
-	        this.sound.setNodeSource(soundSource);
-	        this.el.emit('sound-source-set', { soundSource: soundSource });
-	      }
-	      this.stream = newStream;
-	    }
+	    //     const soundSource = this.sound.context.createMediaStreamSource(newStream); 
+	    //     this.sound.setNodeSource(soundSource);
+	    //     this.el.emit('sound-source-set', { soundSource });
+	    //   }
+	    //   this.stream = newStream;
+	    // }
+
 	  },
 
 
