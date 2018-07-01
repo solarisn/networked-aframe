@@ -14,10 +14,12 @@ class AdapterFactory {
   }
 
   register(adapterName, AdapterClass) {
+    console.log("registering adapter");
     this.adapters[adapterName] = AdapterClass;
   }
 
   make(adapterName) {
+    console.log("making adapter");
     var name = adapterName.toLowerCase();
     if (this.adapters[name]) {
       var AdapterClass = this.adapters[name];

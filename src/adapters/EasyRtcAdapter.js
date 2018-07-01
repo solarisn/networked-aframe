@@ -41,15 +41,28 @@ class EasyRtcAdapter extends NoOpAdapter {
     // this.easyrtc.enableDebug(true);
     this.easyrtc.enableDataChannels(options.datachannel);
 
-    if (options.screen) {
-      this.easyrtc.setScreenCapture();
-    }
+    // if (options.screen) {
+    //   this.easyrtc.setScreenCapture();
+    // }
+    // if (options.screen) {
+    //   //this.registerScreenStream()
+    // }
 
-    this.easyrtc.enableVideo(options.video/*false*/); //solaris
+    this.easyrtc.enableVideo(true/*false*/); //solaris
     this.easyrtc.enableAudio(options.audio);
 
-    this.easyrtc.enableVideoReceive(options.video/*false*/);
+    this.easyrtc.enableVideoReceive(true/*false*/);
     this.easyrtc.enableAudioReceive(options.audio);
+  }
+
+  registerScreenStream(ownerId, stream) {
+    console.log("REGISTER 3rd party local media");
+    console.log(stream);
+    window.easyrtc.register3rdPartyLocalMediaStream(stream, "screen");
+    console.log(ownerId + ' : ' + stream);
+    window.localScreenStream = stream;
+    AFRAME.scenes[0].emit('connect');
+
   }
 
   setServerConnectListeners(successListener, failureListener) {
@@ -107,40 +120,51 @@ class EasyRtcAdapter extends NoOpAdapter {
       this.updateTimeOffset(),
       new Promise((resolve, reject) => {
         var mediaEnabled = false;
-        if (this.easyrtc.audioEnabled) {
-          NAF.log.write("connect() : audioEnabled");
-          this._connectWithAudio(resolve, reject);
-          mediaEnabled = true;
-        } 
-        if (this.easyrtc.videoEnabled) {
-          NAF.log.write("connect() : videoEnabled");
-          this._connectWithVideo(resolve, reject);
-          mediaEnabled = true;
-        }
-        if (this.easyrtc.screenEnabled) {
+        //temporary REMOVED AUDIO
+        // if (this.easyrtc.audioEnabled) {
+        //   NAF.log.write("connect() : audioEnabled");
+        //   this._connectWithAudio(resolve, reject);
+        //   mediaEnabled = true;
+        // } 
+        // if (this.easyrtc.videoEnabled) {
+        //   NAF.log.write("connect() : videoEnabled");
+        //   this._connectWithVideo(resolve, reject);
+        //   mediaEnabled = true;
+        // }
+        if (/*this.easyrtc.screenEnabled*/true) {
           NAF.log.write("connect() : screenEnabled");
+          NAF.log.write('register3rd party');
+          window.easyrtc.register3rdPartyLocalMediaStream(window.localScreenStream);
           this._connectWithScreen(resolve, reject);
           mediaEnabled = true;
         }
-        if (!mediaEnabled) {
+
+//        if (!mediaEnabled) {
           NAF.log.write("Connecting without media");
           this.easyrtc.connect(this.app, resolve, reject);
-        } else {
-          NAF.log.write("connecting with media");
-          this._connectWithMedia(resolve, reject);
-        }
+        // } else {
+        //   NAF.log.write("connecting with media");
+        //   this._connectWithMedia(resolve, reject);
+        // }
       })
     ]).then(([_, clientId]) => {
-      NAF.log.write('_storeAudioStream');
-      this._storeAudioStream(
+      // NAF.log.write('_storeAudioStream');
+      // this._storeAudioStream(
+      //   this.easyrtc.myEasyrtcid,
+      //   this.easyrtc.getLocalStream()
+      // );
+      NAF.log.write('_storeScreenStream');
+      console.log('local screen stream: ');
+      console.log(window.localScreenStream);
+      this._storeScreenStream(
         this.easyrtc.myEasyrtcid,
-        this.easyrtc.getLocalStream()
+        window.localScreenStream
       );
-      NAF.log.write('_storeVideoStream');
-      this._storeVideoStream(
-        this.easyrtc.myEasyrtcid,
-        this.easyrtc.getLocalStream()
-      );
+      // NAF.log.write('_storeVideoStream');
+      // this._storeVideoStream(
+      //   this.easyrtc.myEasyrtcid,
+      //   window.easyrtc.getLocalStream()
+      // );
       //this._store
 
       this._myRoomJoinTime = this._getRoomJoinTime(clientId);
@@ -219,19 +243,20 @@ class EasyRtcAdapter extends NoOpAdapter {
     NAF.log.write("trying to get media stream: " + type);
     var that = this;
     let streams;
-    let pendingRequest;
+    let pendingRequestLocal;
     if (type === 'video') {
       console.log("getting video stream");
       streams = this.videoStreams;
-      pendingRequest = that.pendingVideoRequest;
+      pendingRequestLocal = that.pendingVideoRequest;
       console.log(streams);
-      console.log(pendingRequest);
+      console.log(pendingRequestLocal);
     } else if (type === 'audio') {
       streams = this.audioStreams;
-      pendingRequest = that.pendingAudioRequest;
+      pendingRequestLocal = that.pendingAudioRequest;
     } else if (type === 'screen') {
+      console.log('GETTING SCREEN STREAM');
       streams = this.screenStreams;
-      pendingRequest = that.pendingScreenRequest;
+      pendingRequestLocal = that.pendingScreenRequest;
     } else {
       console.log("Failed to getMediaStream for unknown or null type");
       return;
@@ -243,7 +268,7 @@ class EasyRtcAdapter extends NoOpAdapter {
     } else {
       NAF.log.write("Waiting on media for " + clientId);
       return new Promise(function(resolve) {
-        pendingRequest[clientId] = resolve;
+        pendingRequestLocal[clientId] = resolve;
       });
     }
   }
@@ -271,6 +296,16 @@ class EasyRtcAdapter extends NoOpAdapter {
       NAF.log.write("got pending video for " + easyrtcid);
       this.pendingVideoRequest[easyrtcid](stream);
       delete this.pendingVideoRequest[easyrtcid](stream);
+    }
+  }
+
+  _storeScreenStream(easyrtcid, stream) {
+    console.log('storing screen stream: _storeScreenStream');
+    this.screenStreams[easyrtcid] = stream;
+    if (this.pendingScreenRequest[easyrtcid]) {
+      NAF.log.write("got pending screen for " + easyrtcid);
+      this.pendingScreenRequest[easyrtcid](stream);
+      delete this.pendingScreenRequest[easyrtcid](stream);
     }
   }
 
@@ -325,6 +360,15 @@ class EasyRtcAdapter extends NoOpAdapter {
     //   }
     // );
     //_connectWithMedia();
+  }
+
+  _connectWithScreen(connectSuccess, connectFailure) {
+    var that = this;
+    this.easyrtc.setStreamAcceptor(this._storeScreenStream.bind(this));
+
+    this.easyrtc.setOnStreamClosed(function (easyrtcid) {
+      delete that.screenStreams[easyrtcid];
+    });
   }
 // end solaris
 

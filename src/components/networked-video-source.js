@@ -4,10 +4,19 @@ var naf = require('../NafIndex');
 AFRAME.registerComponent('networked-video-source', {
   schema: {
     positional: { default: true },
-    rotational: { default: true }
+    rotational: { default: true },
+    message: {default: "SLDHJLSKDJFLKJSLDKFJLSKJDFLKJS"},
+    event: {default: "newStream"}
   },
 
   init: function () {
+
+    var self = this;
+    this.eventHandlerFn = function () { console.log(self.data.message); };
+
+    window.extensionInstalled = false;
+
+
     console.log('initializing a networked-video-source');
     this.listener = null;
     this.stream = null;
@@ -17,42 +26,87 @@ AFRAME.registerComponent('networked-video-source', {
 
     this._makeId = this._makeId.bind(this);
     this._setMediaStream = this._setMediaStream.bind(this);
+    this._startScreenStreamFrom = this._startScreenStreamFrom.bind(this);
+    this._registerScreenStream = this._registerScreenStream.bind(this);
 
     NAF.utils.getNetworkedEntity(this.el).then((networkedEl) => {
       const ownerId = networkedEl.components.networked.data.owner;
-      console.log("owner of this video elemt is: " + ownerId);
+      this.ownerId = ownerId;
+      console.log("owner of this video element is: " + ownerId);
       if (ownerId) {
         console.log("ownerid exists!");
-        NAF.connection.adapter.getMediaStream(ownerId, 'video')
+        NAF.connection.adapter.getMediaStream(ownerId, 'screen')
           .then(this._setMediaStream)
           .catch((e) => naf.log.error(`Error getting video stream for ${ownerId}`, e));
       } else {
+        window.localScreenEl = this;
         console.log("ownerid doesn't exist because it belongs to the local player!");
         // Correctly configured local entity, perhaps do something here for enabling debug audio loopback
         // NAF.connection.adapter.getMediaStream(ownerId, 'video')
         //   .then(this._setMediaStream)
         //   .catch((e) => naf.log.error(`Error getting video stream for ${ownerId}`, e));
-        if (navigator.mediaDevices.getUserMedia) { 
-          //console.log(NAF.connection);
-        console.log("user media exists");      
-            navigator.mediaDevices.getUserMedia({video: true})
-          .then(this._setMediaStream)
-          .catch(function(error) {
-            console.log("Something went wrong!");
-            console.log(error);
-          });
+        // if (navigator.mediaDevices.getUserMedia) { 
+        //   //console.log(NAF.connection);
+        // console.log("user media exists");      
+        //     navigator.mediaDevices.getUserMedia({video: true})
+        //   .then(this._setMediaStream)
+        //   .catch(function(error) {
+        //     console.log("Something went wrong!");
+        //     console.log(error);
+        //   });
 
 
+
+        // }
+
+                // listen for messages from the content-script
+    window.addEventListener('message', function (event) {
+      console.log("message from chrome extension: ");
+      console.log(event);
+      if (event.origin != window.location.origin) return;
+
+      // content-script will send a 'SS_PING' msg if extension is installed
+      if (event.data.type && (event.data.type === 'SS_PING')) {
+        console.log("WE GOT EM'!");
+        window.extensionInstalled = true;
+        if (!window.localScreenStream) {
+          window.postMessage({ type: 'SS_UI_REQUEST', text: 'start' }, '*');
 
         }
+      }
+
+      // user chose a stream
+      if (event.data.type && (event.data.type === 'SS_DIALOG_SUCCESS')) {
+        //console.log("")
+        window.localScreenEl._startScreenStreamFrom(event.data.streamId);
+
+        //this.el.emit('newStream', event.data.streamId);
+      }
+
+      // user clicked on 'cancel' in choose media dialog
+      if (event.data.type && (event.data.type === 'SS_DIALOG_CANCEL')) {
+        console.log('User cancelled!');
+      }
+    });
 
         //this._setMediaStream();
       }
     });
   },
 
-  update() {
-    //this._setPannerProperties();
+  update: function (oldData) {
+    var data = this.data;
+    var el = this.el;
+
+    if (oldData.event && data.event !== oldData.event) {
+      el.removeEventListener(oldData.event, this.eventHandlerFn);
+    }
+
+    if (data.event) {
+      el.addEventListener(data.event, this.eventHandlerFn);
+    } else {
+      console.log(data.message);
+    }
   },
 
   _setMediaStream(newStream) {
@@ -106,6 +160,43 @@ AFRAME.registerComponent('networked-video-source', {
 
   },
 
+  _startScreenStreamFrom(streamId) {
+    console.log("startScreenStreamFrom");
+    
+    navigator.webkitGetUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: streamId,
+          maxWidth: window.screen.width,
+          maxHeight: window.screen.height
+        }
+      }
+    },
+    // successCallback
+    function(screenStream) {
+      let videoElement;
+      console.log("screenStream retrieved! Trying to set on video element");
+      //videoElement = document.getElementById('dtStream');
+      //videoElement.srcObject = screenStream;//= URL.createObjectURL(screenStream);
+      //videoElement.play();
+      window.localScreenEl._registerScreenStream(window.localScreenEl.ownerId, screenStream);
+      window.localScreenEl._setMediaStream(screenStream);
+    },
+    // errorCallback
+    function(err) {
+      console.log('getUserMedia failed!: ' + err);
+    });
+    
+  },
+
+  _registerScreenStream(ownerId, stream) {
+    //NAF.connection.adapter.registerScreenStream(ownerId, stream);
+    window.localScreenStream = stream;
+    AFRAME.scenes[0].emit('connect');
+  },
+
   _makeId(length) {
     var text = "";
     var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -126,13 +217,14 @@ AFRAME.registerComponent('networked-video-source', {
   //   }
   // },
 
-  remove: function() {
-    // if (!this.sound) return;
+  remove: function () {
+    var data = this.data;
+    var el = this.el;
 
-    // this.el.removeObject3D(this.attrName);
-    // if (this.stream) {
-    //   this.sound.disconnect();
-    // }
+    // Remove event listener.
+    if (data.event) {
+      el.removeEventListener(data.event, this.eventHandlerFn);
+    }
   },
 
   setupSound: function() {
